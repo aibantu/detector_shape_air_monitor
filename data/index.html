@@ -1,0 +1,482 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body{font-size:18px;margin:20px;}
+        .wifi-item{margin:10px;padding:10px;border:1px solid #ccc;}
+        .pass-form{display:none;margin:10px 0 20px 20px;}
+    </style>
+</head>
+<body>
+    <h2>选择你的WiFi</h2>
+    WiFi列表占位符：C++中替换这里 -->
+    <!-- {{WIFI_LIST_CONTENT}} -->
+
+    <!-- <script>
+        function showPass(ssid) {
+            var forms = document.getElementsByClassName('pass-form');
+            for(var i=0;i<forms.length;i++) forms[i].style.display='none';
+            document.getElementById('form_'+ssid).style.display='block';
+        }
+    </script>
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ESP32 WiFi配置</title>
+    <style>
+        /* 全局样式重置与基础配置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+            padding: 20px 15px;
+            color: #333;
+        }
+
+        /* 容器样式 */
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+        }
+
+        /* 头部样式 */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #2d3748;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 14px;
+        }
+
+        /* 按钮通用样式 */
+        .btn {
+            display: inline-block;
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background-color: #4299e1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #3182ce;
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #2d3748;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e0;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* WiFi列表样式 */
+        .wifi-list {
+            margin: 20px 0;
+        }
+
+        .wifi-item {
+            background-color: white;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s ease;
+        }
+
+        .wifi-item:hover {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .wifi-ssid {
+            font-size: 17px;
+            color: #2d3748;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .wifi-ssid::before {
+            content: "";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234299e1'%3E%3Cpath d='M12 4C7.31 4 3.07 5.9 0 8.98L12 21L24 8.98C20.93 5.9 16.69 4 12 4ZM12 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2Z'%3E%3C/path%3E%3C/svg%3E");
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+
+        /* 密码表单样式 */
+        .wifi-form {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2);
+        }
+
+        /* 状态提示样式 */
+        .status {
+            text-align: center;
+            padding: 20px;
+            font-size: 16px;
+        }
+
+        .status-loading {
+            color: #4299e1;
+        }
+
+        .status-error {
+            color: #e53e3e;
+        }
+
+        .status-success {
+            color: #48bb78;
+        }
+
+        /* 加载动画 */
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(66, 153, 225, 0.3);
+            border-radius: 50%;
+            border-top-color: #4299e1;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 响应式适配 */
+        @media (max-width: 375px) {
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .wifi-item {
+                padding: 14px;
+            }
+
+            .btn {
+                padding: 10px 14px;
+                font-size: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>WiFi配置助手</h1>
+            <p>选择您要连接的WiFi网络</p>
+        </div>
+
+        <button id="refreshBtn" class="btn btn-primary" onclick="loadWifiList()">
+            <span class="loader" style="display: none;"></span>
+            刷新WiFi列表
+        </button>
+
+        <div id="wifiListContainer" class="wifi-list">
+            <div class="status status-loading">
+                <span class="loader"></span>正在扫描WiFi网络...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载完成后自动获取WiFi列表
+        window.addEventListener('DOMContentLoaded', loadWifiList);
+
+        // 全局变量
+        let isSubmitting = false; // 防止重复提交
+
+        // 获取WiFi列表（优化：加载状态、错误处理）
+        function loadWifiList() {
+            const container = document.getElementById('wifiListContainer');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const loader = refreshBtn.querySelector('.loader');
+
+            // 设置加载状态
+            container.innerHTML = '<div class="status status-loading"><span class="loader"></span>正在扫描WiFi网络...</div>';
+            refreshBtn.disabled = true;
+            loader.style.display = 'inline-block';
+
+            // 发起请求
+            fetch('/api/wifilist', { 
+                cache: 'no-cache',
+                method: 'GET'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP错误，状态码：${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                renderWifiList(data);
+            })
+            .catch(error => {
+                console.error('获取WiFi列表失败:', error);
+                container.innerHTML = `
+                    <div class="status status-error">
+                        扫描WiFi失败，请点击刷新重试
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // 恢复按钮状态
+                refreshBtn.disabled = false;
+                loader.style.display = 'none';
+            });
+        }
+
+        // 渲染WiFi列表（优化：空列表处理、样式美化）
+        function renderWifiList(data) {
+            const container = document.getElementById('wifiListContainer');
+
+            if (data.status === 'scanning') {
+                container.innerHTML = `<div class="status status-loading"><span class="loader"></span>${data.message}</div>`;
+                return;
+            }
+    
+            if (data.status === 'error') {
+                container.innerHTML = `<div class="status status-error">${data.message}</div>`;
+                return;
+            }
+
+            const networks = data.data || []
+            
+            // 处理空列表
+            if ( networks.length === 0) {
+                container.innerHTML = `
+                    <div class="status status-loading">
+                        未检测到可用的WiFi网络
+                        <button class="btn btn-secondary" style="margin-top:10px;" onclick="loadWifiList()">
+                            重新扫描
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            // 生成WiFi列表HTML
+            let html = '';
+            networks.forEach(network => {
+                // 安全转义SSID特殊字符
+                const escapedSSID = escapeHtml(network.ssid);
+                
+                html += `
+                <div class="wifi-item">
+                    <div class="wifi-ssid" onclick="showPasswordForm('${escapedSSID}')">
+                        ${escapedSSID}
+                        ${network.encrypted ? '<span style="margin-left:8px;font-size:12px;color:#718096;">(加密)</span>' : ''}
+                    </div>
+                    <div class="wifi-form" id="form_${escapedSSID}">
+                        <div class="form-group">
+                            <input type="password" class="form-control" id="pass_${escapedSSID}" 
+                                   placeholder="请输入WiFi密码" autocomplete="off">
+                        </div>
+                        <button class="btn btn-primary" onclick="submitWifiConfig('${escapedSSID}', this)">
+                            连接WiFi
+                        </button>
+                        <button class="btn btn-secondary" onclick="hidePasswordForm('${escapedSSID}')">
+                            取消
+                        </button>
+                    </div>
+                </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 显示密码输入表单
+        function showPasswordForm(ssid) {
+            // 隐藏所有表单
+            document.querySelectorAll('.wifi-form').forEach(form => {
+                form.style.display = 'none';
+            });
+            
+            // 显示当前表单并聚焦输入框
+            const form = document.getElementById(`form_${ssid}`);
+            if (form) {
+                form.style.display = 'block';
+                const passwordInput = document.getElementById(`pass_${ssid}`);
+                if (passwordInput) {
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                }
+            }
+        }
+
+        // 隐藏密码输入表单
+        function hidePasswordForm(ssid) {
+            const form = document.getElementById(`form_${ssid}`);
+            if (form) {
+                form.style.display = 'none';
+            }
+        }
+
+        // 提交WiFi配置（优化：防重复提交、状态反馈）
+        function submitWifiConfig(ssid, btn) {
+            // 防止重复提交
+            if (isSubmitting) return;
+            
+            const passwordInput = document.getElementById(`pass_${ssid}`);
+            const password = passwordInput.value.trim();
+            const form = document.getElementById(`form_${ssid}`);
+
+            // 验证密码
+            if (!password) {
+                alert('请输入WiFi密码');
+                passwordInput.focus();
+                return;
+            }
+
+            // 设置提交状态
+            isSubmitting = true;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loader"></span>正在连接...';
+            
+            // 构建表单数据
+            const formData = new URLSearchParams();
+            formData.append('ssid', ssid);
+            formData.append('pass', password);
+
+            // 发起提交请求
+            fetch('/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData,
+                timeout: 15000 // 15秒超时
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('服务器响应异常');
+                }
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    return response.text().then(text => {
+                        // 尝试从错误响应中提取有价值信息
+                        if (text.startsWith('{')) {
+                            return JSON.parse(text); // 尝试解析JSON
+                        }
+                        throw new Error(`服务器返回非JSON响应: ${text.substring(0, 100)}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    // 配置成功
+                    form.innerHTML = `
+                        <div class="status status-success">
+                            <span class="loader" style="border-top-color: #48bb78;"></span>
+                            配置成功！设备正在重启...
+                        </div>
+                    `;
+                    // 禁用刷新按钮
+                    document.getElementById('refreshBtn').disabled = true;
+                } else {
+                    throw new Error(data.message || '配置失败');
+                }
+            })
+            .catch(error => {
+                console.error('提交配置失败:', error);
+                const escapedPassword = escapeHtml(password);
+                // 恢复表单状态
+                form.innerHTML = `
+                    <div class="form-group">
+                        <input type="password" class="form-control" id="pass_${ssid}" 
+                               placeholder="请输入WiFi密码" autocomplete="off" value="${escapedPassword}">
+                    </div>
+                    <div class="status status-error" style="margin-bottom: 10px;">
+                        ${error.message || '连接失败，请重试'}
+                    </div>
+                    <button class="btn btn-primary" onclick="submitWifiConfig('${ssid}', this)">
+                        重新连接
+                    </button>
+                    <button class="btn btn-secondary" onclick="hidePasswordForm('${ssid}')">
+                        取消
+                    </button>
+                `;
+                isSubmitting = false;
+            });
+        }
+
+        // HTML转义工具函数
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>

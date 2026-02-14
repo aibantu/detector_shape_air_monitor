@@ -1,0 +1,581 @@
+#include <time.h>
+#include "screenDisplay.h"
+#include <Preferences.h> // 用于保存首次配置的时间（可选）
+#include <PNGdec.h>
+
+// -------------------------- 配置项 --------------------------
+// #define GMT_OFFSET_SEC  8 * 3600  // 东八区（GMT+8）
+// #define DAYLIGHT_OFFSET 0         // 无夏令时
+// #define RTC_PREFS_NAME  "rtc_time"// 存储时间的命名空间（用于掉电保存）
+
+// // -------------------------- 全局变量 --------------------------
+// Preferences prefs;
+// bool isRtcConfigured = false;    // RTC 是否已配置
+
+TFT_eSprite *dispSprite = nullptr;
+
+uint16_t w = 0;
+uint16_t h = 0;
+
+// DrawConfig drawCfg = {5, 0, 0, 0, 0, 0, 0, 80};
+DisplayLayout dLayout = {
+	.time_date_X = 0,	// 靠左
+	.timeY = 0,
+	.dateY = 0,
+	.sensorIconY = 0,
+	.sensorDataY = 0,
+	.sensorLableY = 0,
+	.sensorDataH = 0,
+	.sensorIcon = 48,
+	.tempX = 0,	// 中心位置
+	.humiX = 0,
+	.co2X = 0,
+	.gifX = 0,
+	.gifY = 0,
+	.gifW = 0,
+	.gifH = 0,
+};
+
+const uint8_t qrCodeData[] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0,
+    0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+    0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0,
+    0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0,
+    0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0,
+    0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+    0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0,
+    0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0,
+    0, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0,
+    0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0,
+    0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0,
+    0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0,
+    0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0,
+    0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0,
+    0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 
+    0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 
+    0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 
+    0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 
+    0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 
+    0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 
+    0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 
+    0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 
+    0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 
+    0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 
+    0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+};
+
+const int qrCodeSize = 32;
+const int qrBlockSize = 5;
+
+
+
+char timeStr[10] = {0};
+String dateStr = "";
+
+// static bool initSprite(TFT_eSprite* &sprite, TFT_eSPI* tft) {
+
+// 	if (sprite) {
+// 		Serial.println("Sprite already initialized!");
+// 		return true;
+// 	}
+	
+// 	sprite = new TFT_eSprite(tft);
+// 	if (!sprite) {
+// 		Serial.println("Failed to create sprite (out of memory)!");
+// 		return false;
+// 	}
+// 	sprite->setColorDepth(16);
+// 	sprite->createSprite(tft->width(), tft->height());
+// 	sprite->fillSprite(TFT_BLACK);
+// 	sprite->setTextColor(TFT_WHITE, TFT_BLACK);
+
+// 	Serial.println("Sprite initialized successfully!");
+// 	return true;
+// }
+
+bool initSprite(TFT_eSPI* tft) {
+
+	if (!tft) {
+		Serial.println("Error: TFT pointer is null");
+		return false;
+	}	
+
+	if (dispSprite) {
+		Serial.println("Sprite already initialized!");
+		return true;
+	}
+	w = tft->width();
+	h = tft->height();
+	dispSprite = new TFT_eSprite(tft);
+	if (!dispSprite) {
+		Serial.println("Failed to create sprite (out of memory)!");
+		return false;
+	}
+	dispSprite->setColorDepth(16);
+	dispSprite->createSprite(w, h);
+	dispSprite->fillSprite(TFT_BLACK);
+	dispSprite->setTextColor(TFT_WHITE, TFT_BLACK);
+
+	Serial.println("Sprite initialized successfully!");
+	return true;
+}
+
+void drawDisplay(bool showQR, const String& text, int qrTextYOffset) {
+
+	// 安全检查：Sprite未初始化直接返回
+    if (dispSprite == nullptr) {
+        Serial.println("Error: dispSprite is not initialized!");
+        return;
+    }
+
+	dispSprite->fillScreen(TFT_BLACK);
+
+	if (showQR) {
+		if (qrCodeData == nullptr || qrCodeSize <= 0) {
+			Serial.println("Error: QR code data is invalid!");
+            return;
+		}
+
+		int qrTotalSize = qrCodeSize * qrBlockSize;  // 二维码总像素宽度
+    	int xOffset = (w - qrTotalSize) / 2;   // 水平居中偏移
+    	int yOffset = (h - qrTotalSize) / 2;  // 垂直居中偏移
+
+		// 遍历二维码矩阵，绘制每个模块
+		for (int y = 0; y < qrCodeSize; y++) {
+			for (int x = 0; x < qrCodeSize; x++) {
+				// 从矩阵中获取当前模块的颜色（0=白，1=黑）
+				// 假设矩阵是按行存储的一维数组，index = y * matrixSize + x
+				bool isBlack = qrCodeData[y * qrCodeSize + x] == 1;
+				
+				// 计算当前模块在Sprite中的坐标
+				int drawX = xOffset + x * qrBlockSize;
+				int drawY = yOffset + y * qrBlockSize;
+				
+				// 绘制模块（填充矩形）
+				dispSprite->fillRect(
+					drawX,          // 起始X
+					drawY,          // 起始Y
+					qrBlockSize,      // 宽度
+					qrBlockSize,      // 高度
+					isBlack ? TFT_BLACK : TFT_WHITE  // 颜色
+				);
+			}
+		}
+
+		if (text.length() > 0) {
+			dispSprite->setTextDatum(TC_DATUM);
+			dispSprite->setTextFont(MIDDLE_FONT_ID);
+			dispSprite->drawString(text, w / 2, yOffset + qrTotalSize + qrTextYOffset);
+		}
+	} else {
+		if (text.length() > 0) {
+			dispSprite->setTextDatum(TC_DATUM);
+			dispSprite->setTextFont(MIDDLE_FONT_ID);
+
+			int fontH = dispSprite->fontHeight();
+			int lineCount = 1;
+			String temp = text;
+
+			while (temp.indexOf('\n') != -1) {
+				lineCount++;
+				temp = temp.substring(temp.indexOf('\n') + 1);
+			}
+
+			// 计算文字整体居中的起始Y坐标
+            int totalTextHeight = lineCount * fontH;
+            int startY = (h - totalTextHeight) / 2;
+            int lineIndex = 0;
+
+            // 拆分并绘制多行文字
+            temp = text;
+			while(lineIndex != lineCount){
+				String line = temp.substring(0, temp.indexOf('\n'));
+				dispSprite->drawString(line, w / 2, startY + lineIndex * fontH);
+				temp = temp.substring(temp.indexOf('\n') + 1);
+				lineIndex++;
+			} 
+            
+            // 绘制最后一行
+            if (temp.length() > 0) {
+                dispSprite->drawString(temp, w / 2, startY + lineIndex * fontH);
+            }
+		}
+	}
+
+	dispSprite->pushSprite(0, 0);		
+}
+
+
+// 将 __DATE__ 解析为 YYYY-MM-DD（__DATE__ 格式: "Nov 17 2025"）
+String formatDate() {
+  const char *dateStr = __DATE__; // 例如 "Nov 17 2025"
+  char monStr[4];
+  int day, year;
+  sscanf(dateStr, "%3s %d %d", monStr, &day, &year);
+  const char *months = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  int monthNum = (strstr(months, monStr) - months) / 3 + 1;
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%04d-%02d-%02d", year, monthNum, day);
+  return String(buf);
+}
+
+
+
+void calcLayoutParams() {
+
+	dateStr = formatDate();
+
+	// 时间区域
+	int16_t timeW = dispSprite->textWidth("88:88", LARGE_FONT_ID);
+	int16_t timeH = dispSprite->fontHeight(LARGE_FONT_ID);
+	int16_t dateW = dispSprite->textWidth(dateStr, MIDDLE_FONT_ID);
+	int16_t dateH = dispSprite->fontHeight(MIDDLE_FONT_ID);
+	
+	dLayout.time_date_X = w / 8;
+
+	dLayout.timeY = (h / 2 - timeH - dateH) / 3;
+
+	dLayout.dateY = dLayout.timeY * 2 + timeH;
+
+	// 传感器区域
+
+	dLayout.sensorDataH = dispSprite->fontHeight(MIDDLE_FONT_ID);
+
+	int16_t gap = (h / 2 - dLayout.sensorIcon  - dLayout.sensorDataH ) / 4;
+
+	dLayout.sensorIconY = h / 2 + gap;
+
+	// dLayout.sensorIconY = h / 2 + sensorAreaGap;
+	dLayout.sensorDataY = dLayout.sensorIconY + dLayout.sensorIcon + gap * 3 / 2;
+	// dLayout.sensorLableY = dLayout.sensorDataY + dLayout.sensorDataH + sensorAreaGap / 2;
+
+	gap = (w - dLayout.sensorIcon * 3) / 3;
+
+	dLayout.tempX = gap / 2;
+	dLayout.humiX = gap *3 / 2 + dLayout.sensorIcon;
+	dLayout.co2X = w - gap / 2 - dLayout.sensorIcon;
+
+	// int16_t tempDataW = dispSprite->textWidth("99.9 C", MIDDLE_FONT_ID);
+	// int16_t humiDataW = dispSprite->textWidth("99.9%", MIDDLE_FONT_ID);
+	// int16_t co2DataW = dispSprite->textWidth("9999", MIDDLE_FONT_ID);
+
+}
+
+void initDrawSensorData(TFT_eSPI* tft, const SensorData* initData) {
+	
+	// 若尚未创建，则在此创建 Sprite
+	if (!dispSprite) {
+		dispSprite = new TFT_eSprite(tft);
+		if(!dispSprite) {
+			Serial.println("Failed to create sprite!");
+			while(1);
+		}
+		dispSprite->setColorDepth(16);
+		dispSprite->createSprite(w, h);
+		dispSprite->setTextColor(TFT_WHITE, TFT_BLACK);
+	} 
+
+	dispSprite->fillSprite(TFT_BLACK);
+
+	calcLayoutParams();
+
+	// 时间
+	dispSprite->setTextDatum(TL_DATUM);
+	dispSprite->setTextFont(LARGE_FONT_ID);
+	dispSprite->drawString("17:24", dLayout.time_date_X - dispSprite->textWidth("9", MIDDLE_FONT_ID) , dLayout.timeY);
+	dispSprite->setTextFont(MIDDLE_FONT_ID);
+	dispSprite->setCursor(dLayout.time_date_X, dLayout.dateY);
+	dispSprite->print(dateStr);
+	dispSprite->drawString(dateStr, dLayout.time_date_X, dLayout.dateY);
+
+	// 传感器
+
+	// Icon
+	dispSprite->pushImage(dLayout.tempX, dLayout.sensorIconY, 48, 48, icon_temp);
+	dispSprite->pushImage(dLayout.humiX, dLayout.sensorIconY, 48, 48, icon_humi);
+	dispSprite->pushImage(dLayout.co2X, dLayout.sensorIconY, 48, 48, icon_CO2);
+
+
+	// Data
+	dispSprite->setTextFont(MIDDLE_FONT_ID);
+	dispSprite->setTextDatum(TR_DATUM);
+
+	int16_t xaa = dispSprite->textWidth("9", MIDDLE_FONT_ID) + dLayout.sensorIcon / 2;
+
+	dLayout.tempX += xaa;
+	dLayout.humiX += xaa;
+
+	dispSprite->drawString(String(initData->temp, 1) , dLayout.tempX, dLayout.sensorDataY);
+	dispSprite->drawString(String(initData->humi, 1) , dLayout.humiX, dLayout.sensorDataY);
+
+	dispSprite->setTextDatum(TL_DATUM);
+	dispSprite->drawString("C", dLayout.tempX + CIRCLE_RADIUS * 2, dLayout.sensorDataY);
+	dispSprite->drawCircle(dLayout.tempX + CIRCLE_RADIUS, dLayout.sensorDataY + CIRCLE_RADIUS, CIRCLE_RADIUS, TFT_WHITE);
+	dispSprite->drawString("%", dLayout.humiX, dLayout.sensorDataY);
+
+	dispSprite->setTextDatum(TC_DATUM);
+	dispSprite->drawString(String(initData->co2, 0), dLayout.co2X, dLayout.sensorDataY);	
+
+	// // Label
+	// dispSprite->setTextDatum(TC_DATUM);
+	// dispSprite->setTextFont(SMALL_FONT_ID);
+	// dispSprite->drawString("Temp", dLayout.tempX, dLayout.sensorLableY);
+	// dispSprite->drawString("Humi", dLayout.humiX, dLayout.sensorLableY);
+	// dispSprite->drawString("CO2(ppm)", dLayout.co2X, dLayout.sensorLableY);
+
+	dispSprite->pushSprite(0, 0);
+}
+
+void updateSensorData(TFT_eSprite* sprite, int id, float value, const DisplayLayout* dl) {
+	if (!sprite) return;
+
+	char valueBuf[10];
+	int16_t targetX = 0;
+	// uint16_t color = TFT_WHITE;
+	int16_t strWidth = 0;
+	int16_t targetW = sprite->textWidth("9999", MIDDLE_FONT_ID);
+
+
+	switch(id) {
+	    case 1: // 温度
+			// color = TFT_YELLOW;
+			targetX = dl->tempX;
+        	sprintf(valueBuf, "%.1f", value);
+			break;
+	    case 2: // 湿度
+			// color = TFT_GREENYELLOW;
+			targetX = dl->humiX;
+        	sprintf(valueBuf, "%.1f", value);
+			break;
+	    case 3: // CO2
+			// color = TFT_GREEN;
+			targetX = dl->co2X + targetW / 2;
+	        sprintf(valueBuf, "%04d", (int)value);
+			break;
+	    default:
+			return;
+	}
+
+	sprite->fillRect(targetX - targetW, dl->sensorDataY, targetW, dl->sensorDataH, TFT_BLACK);
+
+	targetW = sprite->textWidth(valueBuf, MIDDLE_FONT_ID);
+	targetX -= targetW;
+	sprite->fillRect(targetX, dl->sensorDataY, targetW, dl->sensorDataH, TFT_BLACK);
+    sprite->setTextFont(MIDDLE_FONT_ID);
+	sprite->setCursor(targetX, dl->sensorDataY);
+	sprite->print(valueBuf);
+	sprite->pushSprite(targetX - 2, dl->sensorDataY - 2, targetX - 2, dl->sensorDataY - 2, targetW + 4, dl->sensorDataH + 4);
+}
+
+void updateWeatherWind(TFT_eSprite* sprite, int windLevel, const DisplayLayout* dl) {
+	if (!sprite || !dl) return;
+
+	// Use the third slot area (same as CO2 position)
+	const int16_t centerX = dl->co2X + 24; // icon is 48px wide
+	const int16_t y = dl->sensorDataY;
+
+	char buf[16];
+	if (windLevel < 0) {
+		strcpy(buf, "--");
+	} else {
+		if (windLevel > 12) windLevel = 12;
+		snprintf(buf, sizeof(buf), "Lv%d", windLevel);
+	}
+
+	const String text = String(buf);
+
+	sprite->setTextFont(MIDDLE_FONT_ID);
+	sprite->setTextDatum(TC_DATUM);
+
+	int16_t maxW = sprite->textWidth("Lv12", MIDDLE_FONT_ID);
+	int16_t wText = sprite->textWidth(text, MIDDLE_FONT_ID);
+	int16_t clearW = wText > maxW ? wText : maxW;
+	int16_t clearX = centerX - clearW / 2 - 2;
+	if (clearX < 0) clearX = 0;
+
+	sprite->fillRect(clearX, y, clearW + 4, dl->sensorDataH, TFT_BLACK);
+	sprite->drawString(text, centerX, y);
+	sprite->pushSprite(clearX, y - 2, clearX, y - 2, clearW + 4, dl->sensorDataH + 4);
+}
+
+namespace {
+	// NOTE: PNGdec's PNG object contains large decode buffers.
+	// If we create it as a local variable, it lives on the loopTask stack and can overflow.
+	static PNG g_png;
+
+	struct PngDrawContext {
+		TFT_eSprite* sprite;
+		int16_t x;
+		int16_t y;
+		PNG* png;
+		uint32_t bg;
+	};
+
+	static void* pngOpen(const char* filename, int32_t* size) {
+		File* f = new File(SPIFFS.open(filename, "r"));
+		if (!f || !(*f)) {
+			if (f) delete f;
+			return nullptr;
+		}
+		*size = (int32_t)f->size();
+		return (void*)f;
+	}
+
+	static void pngClose(void* handle) {
+		File* f = (File*)handle;
+		if (!f) return;
+		f->close();
+		delete f;
+	}
+
+	static int32_t pngRead(PNGFILE* pFile, uint8_t* buffer, int32_t length) {
+		File* f = (File*)pFile->fHandle;
+		if (!f) return 0;
+		return (int32_t)f->read(buffer, length);
+	}
+
+	static int32_t pngSeek(PNGFILE* pFile, int32_t position) {
+		File* f = (File*)pFile->fHandle;
+		if (!f) return -1;
+		return f->seek(position) ? position : -1;
+	}
+
+	static int pngDraw(PNGDRAW* pDraw) {
+		PngDrawContext* ctx = (PngDrawContext*)pDraw->pUser;
+		if (!ctx || !ctx->sprite || !ctx->png) return 0;
+
+		static uint16_t lineBuf[320];
+		ctx->sprite->setSwapBytes(true);
+		ctx->png->getLineAsRGB565(pDraw, lineBuf, PNG_RGB565_BIG_ENDIAN, ctx->bg);
+		ctx->sprite->pushImage(ctx->x, ctx->y + pDraw->y, pDraw->iWidth, 1, lineBuf);
+		ctx->sprite->setSwapBytes(false);
+		return 1;
+	}
+
+	static String stripDigitsPrefix(const String& baseName) {
+		int i = 0;
+		while (i < (int)baseName.length() && isDigit(baseName[i])) i++;
+		return baseName.substring(i);
+	}
+
+	static String findWeatherIconPath(const String& weatherText) {
+		if (weatherText.length() == 0) return "";
+
+		// NOTE: ESP32 SPIFFS  	 	 	
+		// SPIFFS  	 	
+		//  	 	
+		// SPIFFS  	 	
+		// 
+		//  	
+		// Some Arduino FS backends do not expose real directories for SPIFFS; enumerate from root
+		File root = SPIFFS.open("/");
+		if (!root || !root.isDirectory()) return "";
+
+		String best = "";
+		// pass 1: exact label match (after removing leading digits)
+		for (File f = root.openNextFile(); f; f = root.openNextFile()) {
+			String name = String(f.name());
+			f.close();
+			if (!name.startsWith("/new_ico/")) continue;
+			if (!name.endsWith(".png") && !name.endsWith(".PNG")) continue;
+			String base = name;
+			base.replace("/new_ico/", "");
+			base.replace(".png", "");
+			base.replace(".PNG", "");
+			String label = stripDigitsPrefix(base);
+			if (label == weatherText) {
+				best = name;
+				break;
+			}
+		}
+
+		if (best.length()) return best;
+
+		// pass 2: substring match
+		root = SPIFFS.open("/");
+		for (File f = root.openNextFile(); f; f = root.openNextFile()) {
+			String name = String(f.name());
+			f.close();
+			if (!name.startsWith("/new_ico/")) continue;
+			if (!name.endsWith(".png") && !name.endsWith(".PNG")) continue;
+			String base = name;
+			base.replace("/new_ico/", "");
+			base.replace(".png", "");
+			base.replace(".PNG", "");
+			String label = stripDigitsPrefix(base);
+			if (label.indexOf(weatherText) >= 0) {
+				best = name;
+				break;
+			}
+		}
+
+		if (best.length()) return best;
+		if (SPIFFS.exists("/new_ico/99.png")) return "/new_ico/99.png";
+		return "";
+	}
+}
+
+void updateWeatherIcon(TFT_eSprite* sprite, const String& weatherText) {
+	if (!sprite) return;
+
+	static String lastPath = "";
+	static int16_t lastX = 0, lastY = 0, lastW = 0, lastH = 0;
+
+	String path = findWeatherIconPath(weatherText);
+	if (!path.length()) {
+		static String lastMiss = "";
+		if (weatherText != lastMiss) {
+			Serial.printf("[weather-icon] no match for weatherText=%s\n", weatherText.c_str());
+			lastMiss = weatherText;
+		}
+		return;
+	}
+	if (path == lastPath) return;
+	Serial.printf("[weather-icon] weatherText=%s path=%s\n", weatherText.c_str(), path.c_str());
+
+	int rc = g_png.open(path.c_str(), pngOpen, pngClose, pngRead, pngSeek, pngDraw);
+	if (rc != PNG_SUCCESS) {
+		Serial.printf("[weather-icon] open failed rc=%d path=%s\n", rc, path.c_str());
+		return;
+	}
+
+	const int iconW = g_png.getWidth();
+	const int iconH = g_png.getHeight();
+	const int16_t x = (int16_t)(w - iconW - 4);
+	const int16_t y = 4;
+
+	// clear previous icon area (if any)
+	if (lastW > 0 && lastH > 0) {
+		sprite->fillRect(lastX, lastY, lastW, lastH, TFT_BLACK);
+		sprite->pushSprite(lastX, lastY, lastX, lastY, lastW, lastH);
+	}
+
+	PngDrawContext ctx{sprite, x, y, &g_png, 0x000000};
+	// decode draws via callback
+	g_png.decode(&ctx, 0);
+	g_png.close();
+
+	// push updated icon region
+	sprite->pushSprite(x, y, x, y, iconW, iconH);
+
+	lastPath = path;
+	lastX = x;
+	lastY = y;
+	lastW = iconW;
+	lastH = iconH;
+}
+
+void safeDeleteSprite(TFT_eSprite* sprite) {
+	if (sprite) {
+		sprite->deleteSprite();
+		delete sprite;
+		sprite = nullptr;
+	}
+}
